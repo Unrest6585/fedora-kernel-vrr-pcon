@@ -199,17 +199,3 @@ jobs:
             --chroot fedora-43-x86_64 \
             --nowait
 
-      - name: Update last built version
-        if: github.event_name != 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createOrUpdateRepoVariable({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'LAST_BUILT_KERNEL',
-              value: '${{ needs.check-kernel.outputs.kernel_version }}'
-            }).catch(() => {
-              // Variable might not exist, that's ok
-              console.log('Could not update LAST_BUILT_KERNEL variable');
-            });
