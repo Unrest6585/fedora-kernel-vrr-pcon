@@ -1,6 +1,7 @@
-From: Tomasz Pakula <tomasz.pakula.mail@gmail.com>
-Date: Mon, 22 Dec 2025 00:23:40 -0800
-Subject: [PATCH 3/4] drm/amd/display: rename PCON adaptive sync types
+From 214a0f8c9caf77872fe708815d3d2d1931a8deb3 Mon Sep 17 00:00:00 2001
+From: npk <npk@fedora-desktop.lan>
+Date: Mon, 29 Dec 2025 04:11:55 +0100
+Subject: [PATCH] drm/amd/display: rename PCON adaptive sync types
 
 Make the name more generic for the upcoming HDMI VRR over PCON
 implementation
@@ -15,42 +16,42 @@ Tested-by: Bernhard Berger <bernhard.berger@gmail.com>
  4 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
-index 7fe40bbba265..1318d88687ae 100644
+index b259439..105ee9a 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
-@@ -9342,7 +9342,7 @@ static void update_freesync_state_on_stream(
-
+@@ -9153,7 +9153,7 @@ static void update_freesync_state_on_stream(
+ 
  	aconn = (struct amdgpu_dm_connector *)new_stream->dm_stream_context;
-
+ 
 -	if (aconn && (aconn->as_type == FREESYNC_TYPE_PCON_IN_WHITELIST || aconn->vsdb_info.replay_mode)) {
 +	if (aconn && (aconn->as_type == ADAPTIVE_SYNC_TYPE_PCON_IN_WHITELIST || aconn->vsdb_info.replay_mode)) {
  		pack_sdp_v1_3 = aconn->pack_sdp_v1_3;
-
+ 
  		if (aconn->vsdb_info.amd_vsdb_version == 1)
-@@ -13003,7 +13003,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+@@ -12817,7 +12817,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
  	if (amdgpu_dm_connector->dc_link)
  		as_type = dm_get_adaptive_sync_support_type(amdgpu_dm_connector->dc_link);
-
+ 
 -	if (as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) {
 +	if (as_type == ADAPTIVE_SYNC_TYPE_PCON_IN_WHITELIST) {
  		i = parse_hdmi_amd_vsdb(amdgpu_dm_connector, edid, &vsdb_info);
  		if (i >= 0 && vsdb_info.freesync_supported && vsdb_info.amd_vsdb_version > 0) {
-
+ 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
-index d0f770dd0a95..63dc9382c48e 100644
+index 5d032ab..53c11f1 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
 @@ -1393,7 +1393,7 @@ enum adaptive_sync_type dm_get_adaptive_sync_support_type(struct dc_link *link)
- 			if (dpcd_caps->adaptive_sync_caps.dp_adap_sync_caps.bits.ADAPTIVE_SYNC_SDP_SUPPORT == true &&
- 				dpcd_caps->allow_invalid_MSA_timing_param == true &&
- 				dm_is_freesync_pcon_whitelist(dpcd_caps->branch_dev_id))
--				as_type = FREESYNC_TYPE_PCON_IN_WHITELIST;
-+				as_type = ADAPTIVE_SYNC_TYPE_PCON_IN_WHITELIST;
- 			break;
- 		default:
- 			break;
+ 		if (dpcd_caps->adaptive_sync_caps.dp_adap_sync_caps.bits.ADAPTIVE_SYNC_SDP_SUPPORT == true &&
+ 			dpcd_caps->allow_invalid_MSA_timing_param == true &&
+ 			dm_is_freesync_pcon_whitelist(dpcd_caps->branch_dev_id))
+-			as_type = FREESYNC_TYPE_PCON_IN_WHITELIST;
++			as_type = ADAPTIVE_SYNC_TYPE_PCON_IN_WHITELIST;
+ 		break;
+ 	default:
+ 		break;
 diff --git a/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h b/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
-index 66dc9a19aebe..91fe039c0c95 100644
+index 66dc9a1..91fe039 100644
 --- a/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
 +++ b/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
 @@ -44,8 +44,8 @@ void mod_build_hf_vsif_infopacket(const struct dc_stream_state *stream,
@@ -63,9 +64,9 @@ index 66dc9a19aebe..91fe039c0c95 100644
 +	ADAPTIVE_SYNC_TYPE_PCON_NOT_IN_WHITELIST = 3,
  	ADAPTIVE_SYNC_TYPE_EDP                   = 4,
  };
-
+ 
 diff --git a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
-index b3d55cac3569..429bc0ab86d6 100644
+index b3d55ca..429bc0a 100644
 --- a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 +++ b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 @@ -535,12 +535,12 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
@@ -83,5 +84,6 @@ index b3d55cac3569..429bc0ab86d6 100644
  	default:
  		break;
  	}
---
+-- 
 2.52.0
+

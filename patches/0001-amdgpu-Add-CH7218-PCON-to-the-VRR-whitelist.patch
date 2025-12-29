@@ -1,6 +1,7 @@
-From: Tomasz Pakula <tomasz.pakula.mail@gmail.com>
+From f39dfbec2f18a89037510611157794b2367ec60c Mon Sep 17 00:00:00 2001
+From: npk <npk@fedora-desktop.lan>
+Date: Mon, 29 Dec 2025 04:11:21 +0100
 Subject: [PATCH] amdgpu: Add CH7218 PCON to the VRR whitelist
-Date: Wed, 10 Dec 2025 01:16:57 -0800
 
 Chrontel CH7218 found in Ugreen DP -> HDMI 2.1 adapter (model 85564)
 works perfectly with VRR after testing. VRR and FreeSync compatibility
@@ -13,10 +14,10 @@ Signed-off-by: Tomasz Pakula <tomasz.pakula.mail@gmail.com>
  2 files changed, 2 insertions(+)
 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
-index d0f770dd0a95..f01f30a245ad 100644
+index 91cda9c..5d032ab 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
-@@ -1374,6 +1374,7 @@ static bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id)
+@@ -1373,6 +1373,7 @@ static bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id)
  	case DP_BRANCH_DEVICE_ID_0060AD:
  	case DP_BRANCH_DEVICE_ID_00E04C:
  	case DP_BRANCH_DEVICE_ID_90CC24:
@@ -25,7 +26,7 @@ index d0f770dd0a95..f01f30a245ad 100644
  		break;
  	default:
 diff --git a/drivers/gpu/drm/amd/display/include/ddc_service_types.h b/drivers/gpu/drm/amd/display/include/ddc_service_types.h
-index 1c603b12957f..e838f7c1269c 100644
+index 1c603b1..e838f7c 100644
 --- a/drivers/gpu/drm/amd/display/include/ddc_service_types.h
 +++ b/drivers/gpu/drm/amd/display/include/ddc_service_types.h
 @@ -36,6 +36,7 @@
@@ -35,6 +36,7 @@ index 1c603b12957f..e838f7c1269c 100644
 +#define DP_BRANCH_DEVICE_ID_2B02F0 0x2B02F0 /* Chrontel CH7218 */
  #define DP_BRANCH_HW_REV_10 0x10
  #define DP_BRANCH_HW_REV_20 0x20
-
---
+ 
+-- 
 2.52.0
+
