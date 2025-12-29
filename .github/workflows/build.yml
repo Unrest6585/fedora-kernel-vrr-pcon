@@ -1,0 +1,224 @@
+name: Build and Upload to COPR
+
+on:
+  schedule:
+    # Check for new kernels daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force a build even if no new kernel'
+        required: false
+        default: 'false'
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - 'patches/**'
+      - '.github/workflows/build.yml'
+
+env:
+  FEDORA_VERSION: '43'
+  COPR_PROJECT: 'kernel-vrr-patches'
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.check.outputs.kernel_version }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for new kernel version
+        id: check
+        run: |
+          # Get latest kernel version from Fedora
+          KERNEL_VER=$(curl -s "https://bodhi.fedoraproject.org/updates/?packages=kernel&status=stable&releases=F${{ env.FEDORA_VERSION }}" | \
+            jq -r '.updates[0].builds[0].nvr // empty' 2>/dev/null || echo "")
+
+          if [ -z "${KERNEL_VER}" ]; then
+            # Fallback: check koji
+            KERNEL_VER=$(curl -s "https://kojipkgs.fedoraproject.org/packages/kernel/" | \
+              grep -oP 'href="\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' | sort -V | tail -1)
+            KERNEL_VER="kernel-${KERNEL_VER}"
+          fi
+
+          echo "kernel_version=${KERNEL_VER}" >> $GITHUB_OUTPUT
+
+          # Check if we already built this version
+          LAST_BUILT="${{ vars.LAST_BUILT_KERNEL || 'none' }}"
+
+          if [ "${{ github.event.inputs.force_build }}" = "true" ] || \
+             [ "${KERNEL_VER}" != "${LAST_BUILT}" ] || \
+             [ "${{ github.event_name }}" = "push" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Will build kernel: ${KERNEL_VER}"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "Kernel ${KERNEL_VER} already built, skipping"
+          fi
+
+  build:
+    needs: check-kernel
+    if: needs.check-kernel.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:${{ env.FEDORA_VERSION }}
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y \
+            git \
+            rpm-build \
+            rpmdevtools \
+            dnf-plugins-core \
+            python3-copr \
+            copr-cli \
+            cpio \
+            wget \
+            curl \
+            jq
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup RPM build tree
+        run: rpmdev-setuptree
+
+      - name: Download kernel SRPM
+        run: |
+          cd ~/rpmbuild/SRPMS
+          dnf download --source kernel
+          SRPM=$(ls -1 kernel-*.src.rpm | head -1)
+          echo "KERNEL_SRPM=${SRPM}" >> $GITHUB_ENV
+          echo "Downloaded: ${SRPM}"
+
+      - name: Extract and patch SRPM
+        run: |
+          cd ~/rpmbuild/SRPMS
+          rpm2cpio ${KERNEL_SRPM} | cpio -idmv -D ~/rpmbuild/SOURCES/
+
+          # Copy our patches
+          cp $GITHUB_WORKSPACE/patches/*.patch ~/rpmbuild/SOURCES/
+
+          # Move spec file
+          mv ~/rpmbuild/SOURCES/kernel.spec ~/rpmbuild/SPECS/
+
+      - name: Modify spec file
+        run: |
+          cd ~/rpmbuild/SPECS
+
+          # Get the last patch number in the spec
+          LAST_PATCH=$(grep -E "^Patch[0-9]+:" kernel.spec | tail -1 | sed 's/Patch\([0-9]*\):.*/\1/')
+          NEXT_PATCH=$((LAST_PATCH + 1))
+
+          # Prepare patch lines
+          PATCH_LINES=""
+          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
+            pname=$(basename "${patch}")
+            PATCH_LINES="${PATCH_LINES}\nPatch${NEXT_PATCH}: ${pname}"
+            NEXT_PATCH=$((NEXT_PATCH + 1))
+          done
+
+          # Add patch definitions after Source lines section
+          # Using a temp file approach for complex sed
+          awk -v patches="$PATCH_LINES" '
+            /^Patch[0-9]+:.*\.patch$/ { last_patch = NR; line = $0 }
+            { lines[NR] = $0 }
+            END {
+              for (i = 1; i <= NR; i++) {
+                print lines[i]
+                if (i == last_patch) {
+                  printf "%s", patches
+                }
+              }
+            }
+          ' kernel.spec > kernel.spec.new
+          mv kernel.spec.new kernel.spec
+
+          # Add patch applications - find where patches are applied
+          # Fedora kernel uses ApplyOptionalPatch macro
+          APPLY_LINES=""
+          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
+            pname=$(basename "${patch}")
+            APPLY_LINES="${APPLY_LINES}\nApplyOptionalPatch ${pname}"
+          done
+
+          # Insert before "# END OF PATCH APPLICATIONS" or at end of patch section
+          sed -i "/^# END OF PATCH APPLICATIONS/i\\
+          # AMD VRR PCON patches from gitlab.freedesktop.org/drm/amd issues 4773 and 4805${APPLY_LINES}" kernel.spec || \
+          sed -i "/ApplyOptionalPatch linux-kernel-test.patch/a\\
+          # AMD VRR PCON patches${APPLY_LINES}" kernel.spec
+
+          # Modify release to indicate patched build
+          sed -i 's/^%define specrelease [0-9]*$/%define specrelease 1.vrr/' kernel.spec
+          # Also handle the buildid
+          sed -i 's/# define buildid .local/%define buildid .vrr/' kernel.spec
+
+      - name: Build SRPM
+        run: |
+          cd ~/rpmbuild
+          rpmbuild -bs SPECS/kernel.spec
+
+          SRPM=$(ls -1t SRPMS/kernel-*.src.rpm | head -1)
+          echo "Built SRPM: ${SRPM}"
+          echo "PATCHED_SRPM=${SRPM}" >> $GITHUB_ENV
+
+          # Copy to workspace for artifact
+          cp "${SRPM}" $GITHUB_WORKSPACE/
+
+      - name: Upload SRPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-srpm
+          path: "*.src.rpm"
+          retention-days: 7
+
+      - name: Setup COPR credentials
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p ~/.config
+          cat > ~/.config/copr <<EOF
+          [copr-cli]
+          login = ${{ secrets.COPR_LOGIN }}
+          username = ${{ secrets.COPR_USERNAME }}
+          token = ${{ secrets.COPR_TOKEN }}
+          copr_url = https://copr.fedorainfracloud.org
+          EOF
+
+      - name: Upload to COPR
+        if: github.event_name != 'pull_request'
+        run: |
+          SRPM=$(ls -1 $GITHUB_WORKSPACE/*.src.rpm | head -1)
+
+          # Create project if it doesn't exist
+          copr-cli create ${{ env.COPR_PROJECT }} \
+            --chroot fedora-${{ env.FEDORA_VERSION }}-x86_64 \
+            --chroot fedora-${{ env.FEDORA_VERSION }}-aarch64 \
+            --description "Fedora kernel with AMD VRR PCON patches (issues #4773 and #4805)" \
+            --instructions "Enable with: sudo dnf copr enable ${{ secrets.COPR_USERNAME }}/${{ env.COPR_PROJECT }}" \
+            2>/dev/null || true
+
+          # Submit build
+          copr-cli build ${{ env.COPR_PROJECT }} "${SRPM}" \
+            --chroot fedora-${{ env.FEDORA_VERSION }}-x86_64 \
+            --chroot fedora-${{ env.FEDORA_VERSION }}-aarch64 \
+            --nowait
+
+      - name: Update last built version
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createOrUpdateRepoVariable({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'LAST_BUILT_KERNEL',
+              value: '${{ needs.check-kernel.outputs.kernel_version }}'
+            }).catch(() => {
+              // Variable might not exist, that's ok
+              console.log('Could not update LAST_BUILT_KERNEL variable');
+            });
