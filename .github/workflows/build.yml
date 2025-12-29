@@ -20,7 +20,7 @@ on:
 
 env:
   FEDORA_VERSION: '43'
-  COPR_PROJECT: 'kernel-vrr-patches'
+  COPR_PROJECT: 'kernel-vrr-pcon'
 
 jobs:
   check-kernel:
@@ -154,9 +154,9 @@ jobs:
           # AMD VRR PCON patches${APPLY_LINES}" kernel.spec
 
           # Modify release to indicate patched build
-          sed -i 's/^%define specrelease [0-9]*$/%define specrelease 1.vrr/' kernel.spec
+          sed -i 's/^%define specrelease [0-9]*$/%define specrelease 1.vrr.pcon/' kernel.spec
           # Also handle the buildid
-          sed -i 's/# define buildid .local/%define buildid .vrr/' kernel.spec
+          sed -i 's/# define buildid .local/%define buildid .vrr.pcon/' kernel.spec
 
       - name: Build SRPM
         run: |

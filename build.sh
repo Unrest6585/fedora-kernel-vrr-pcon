@@ -67,7 +67,7 @@ sed -i "/^# END OF PATCH APPLICATIONS/i\\
 ${PATCH_APPLIES}" kernel.spec
 
 # Update the release tag to indicate this is a custom build
-sed -i 's/^%define specrelease.*/%define specrelease 1.vrr/' kernel.spec
+sed -i 's/^%define specrelease.*/%define specrelease 1.vrr.pcon/' kernel.spec
 
 echo "==> Building SRPM..."
 rpmbuild -bs kernel.spec \
