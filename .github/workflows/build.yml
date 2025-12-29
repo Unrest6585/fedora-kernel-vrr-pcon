@@ -66,7 +66,7 @@ jobs:
     if: needs.check-kernel.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     container:
-      image: fedora:${{ env.FEDORA_VERSION }}
+      image: fedora:43
     steps:
       - name: Install dependencies
         run: |
@@ -194,18 +194,9 @@ jobs:
         run: |
           SRPM=$(ls -1 $GITHUB_WORKSPACE/*.src.rpm | head -1)
 
-          # Create project if it doesn't exist
-          copr-cli create ${{ env.COPR_PROJECT }} \
-            --chroot fedora-${{ env.FEDORA_VERSION }}-x86_64 \
-            --chroot fedora-${{ env.FEDORA_VERSION }}-aarch64 \
-            --description "Fedora kernel with AMD VRR PCON patches (issues #4773 and #4805)" \
-            --instructions "Enable with: sudo dnf copr enable ${{ secrets.COPR_USERNAME }}/${{ env.COPR_PROJECT }}" \
-            2>/dev/null || true
-
-          # Submit build
+          # Submit build (project already created via web UI)
           copr-cli build ${{ env.COPR_PROJECT }} "${SRPM}" \
-            --chroot fedora-${{ env.FEDORA_VERSION }}-x86_64 \
-            --chroot fedora-${{ env.FEDORA_VERSION }}-aarch64 \
+            --chroot fedora-43-x86_64 \
             --nowait
 
       - name: Update last built version
