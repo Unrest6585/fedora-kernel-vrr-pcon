@@ -46,19 +46,36 @@ jobs:
             KERNEL_VER="kernel-${KERNEL_VER}"
           fi
 
-          echo "kernel_version=${KERNEL_VER}" >> $GITHUB_OUTPUT
+          # Extract just the version number (e.g., 6.17.12)
+          KERNEL_VER_SHORT=$(echo "${KERNEL_VER}" | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+          echo "kernel_version=${KERNEL_VER_SHORT}" >> $GITHUB_OUTPUT
+          echo "Latest Fedora kernel: ${KERNEL_VER_SHORT}"
 
-          # Check if we already built this version
-          LAST_BUILT="${{ vars.LAST_BUILT_KERNEL || 'none' }}"
+          # Check COPR for existing successful builds with this version
+          COPR_BUILDS=$(curl -s "https://copr.fedorainfracloud.org/api_3/build/list?ownername=${{ secrets.COPR_USERNAME }}&projectname=${{ env.COPR_PROJECT }}&status=succeeded" | \
+            jq -r '.items[].source_package.version // empty' 2>/dev/null || echo "")
 
-          if [ "${{ github.event.inputs.force_build }}" = "true" ] || \
-             [ "${KERNEL_VER}" != "${LAST_BUILT}" ] || \
-             [ "${{ github.event_name }}" = "push" ]; then
+          ALREADY_BUILT=false
+          for built_ver in $COPR_BUILDS; do
+            if echo "$built_ver" | grep -q "^${KERNEL_VER_SHORT}"; then
+              ALREADY_BUILT=true
+              echo "Found existing COPR build: ${built_ver}"
+              break
+            fi
+          done
+
+          if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Will build kernel: ${KERNEL_VER}"
-          else
+            echo "Force build requested"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Push event - rebuilding with updated patches"
+          elif [ "$ALREADY_BUILT" = "true" ]; then
             echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "Kernel ${KERNEL_VER} already built, skipping"
+            echo "Kernel ${KERNEL_VER_SHORT} already built in COPR, skipping"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "New kernel ${KERNEL_VER_SHORT} - will build"
           fi
 
   build:
