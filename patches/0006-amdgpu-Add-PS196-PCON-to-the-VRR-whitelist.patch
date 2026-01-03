@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: npk <npk@fedora-desktop.lan>
+Date: Fri, 3 Jan 2026 12:00:00 +0100
+Subject: [PATCH] amdgpu: Add PS196 PCON to the VRR whitelist
+
+Parade Technologies PS196 found in CalDigit DP 2.0 to HDMI 2.1 adapter
+supports VRR. The OUI 0x001CF8 is already defined in the kernel, it just
+needs to be added to the PCON whitelist.
+
+DPCD dump from the adapter:
+  OUI (0x500-0x502): 00:1C:F8 (Parade Technologies)
+  Device ID (0x503+): ps196G
+
+Signed-off-by: Tomasz Pakula <tomasz.pakula.mail@gmail.com>
+---
+ drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
+index 53c11f1..a1b2c3d 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
+@@ -1371,6 +1371,7 @@ static bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id)
+ 	switch (branch_dev_id) {
+ 	case DP_BRANCH_DEVICE_ID_0060AD:
+ 	case DP_BRANCH_DEVICE_ID_00E04C:
++	case DP_BRANCH_DEVICE_ID_001CF8: /* Parade PS196 */
+ 	case DP_BRANCH_DEVICE_ID_90CC24:
+ 	case DP_BRANCH_DEVICE_ID_2B02F0:
+ 		ret_val = true;
+--
+2.52.0
+

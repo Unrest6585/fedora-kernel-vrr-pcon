@@ -10,11 +10,12 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 |-------|-------------|-------|
 | 0001 | Add Chrontel CH7218 to VRR PCON whitelist | [#4773](https://gitlab.freedesktop.org/drm/amd/-/issues/4773) |
 | 0002-0005 | Enable HDMI VRR over PCON | [#4805](https://gitlab.freedesktop.org/drm/amd/-/issues/4805) |
+| 0006 | Add Parade PS196 to VRR PCON whitelist | - |
 
 ### Tested Hardware
 
-- **Adapters**: VMM7100, Chrontel CH7218-based (Ugreen model 85564)
-- **Displays**: Samsung S95B, LG C4, Sony Bravia 8, Dell AW3423DWF
+- **Adapters**: VMM7100, Chrontel CH7218-based (Ugreen model 85564), Parade PS196-based (CalDigit DP 2.0 to HDMI 2.1)
+- **Displays**: Samsung S95B, LG C1, LG C4, Sony Bravia 8, Dell AW3423DWF
 
 ## Installation
 
