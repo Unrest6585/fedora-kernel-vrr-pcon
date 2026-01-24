@@ -2,6 +2,12 @@
 build/
 *.src.rpm
 *.rpm
+builder-live.log.gz.txt
+mock/
+mock-result*/
+mock-results*/
+result/
+results/
 
 # Editor files
 *~
