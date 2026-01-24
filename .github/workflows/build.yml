@@ -108,7 +108,24 @@ jobs:
       - name: Download kernel SRPM
         run: |
           cd ~/rpmbuild/SRPMS
-          dnf download --source kernel
+          KERNEL_VER="${{ needs.check-kernel.outputs.kernel_version }}"
+
+          # Get the full NVR (name-version-release) from Koji
+          KOJI_URL="https://kojipkgs.fedoraproject.org/packages/kernel/${KERNEL_VER}"
+
+          # Find the Fedora release number (e.g., 300.fc43)
+          FC_RELEASE=$(curl -s "${KOJI_URL}/" | grep -oP 'href="\K[0-9]+\.fc${{ env.FEDORA_VERSION }}(?=/)' | sort -V | tail -1)
+
+          if [ -z "${FC_RELEASE}" ]; then
+            echo "Error: Could not find kernel ${KERNEL_VER} for Fedora ${{ env.FEDORA_VERSION }}"
+            exit 1
+          fi
+
+          # Download the SRPM
+          SRPM_URL="${KOJI_URL}/${FC_RELEASE}/src/kernel-${KERNEL_VER}-${FC_RELEASE}.src.rpm"
+          echo "Downloading from: ${SRPM_URL}"
+          wget "${SRPM_URL}"
+
           SRPM=$(ls -1 kernel-*.src.rpm | head -1)
           echo "KERNEL_SRPM=${SRPM}" >> $GITHUB_ENV
           echo "Downloaded: ${SRPM}"
