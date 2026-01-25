@@ -82,6 +82,7 @@ jobs:
     needs: check-kernel
     if: needs.check-kernel.outputs.should_build == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 450  # 7.5 hours to allow for 7-hour COPR build + overhead
     container:
       image: fedora:43
     steps:
@@ -229,7 +230,8 @@ jobs:
           SRPM=$(ls -1 $GITHUB_WORKSPACE/*.src.rpm | head -1)
 
           # Submit build (project already created via web UI)
+          # Timeout set to 7 hours (25200 seconds) for kernel builds
           copr-cli build ${{ env.COPR_PROJECT }} "${SRPM}" \
             --chroot fedora-43-x86_64 \
-            --nowait
+            --timeout 25200
 
