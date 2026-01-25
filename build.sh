@@ -60,19 +60,6 @@ done
 sed -i "/^Patch${LAST_PATCH}:/a\\
 ${PATCH_DEFS}" kernel.spec
 
-# Reduce build time and avoid selftest/perf build failures in COPR.
-# These overrides apply during COPR rebuild because they are baked into the SRPM spec.
-sed -i "/# End of genspec.sh variables/a\\
-# VRR PCON local build overrides\\
-%define _with_baseonly 1\\
-%define _without_debuginfo 1\\
-%define _without_perf 1\\
-%define _without_libperf 1\\
-%define _without_tools 1\\
-%define _without_selftests 1\\
-%define debugbuildsenabled 0\\
-" kernel.spec
-
 # Find where patches are applied and add ours
 # The Fedora kernel spec uses ApplyOptionalPatch function
 sed -i "/^# END OF PATCH APPLICATIONS/i\\
