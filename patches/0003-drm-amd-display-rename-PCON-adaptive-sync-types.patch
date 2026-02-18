@@ -1,12 +1,15 @@
-From 214a0f8c9caf77872fe708815d3d2d1931a8deb3 Mon Sep 17 00:00:00 2001
-From: npk <npk@fedora-desktop.lan>
-Date: Mon, 29 Dec 2025 04:11:55 +0100
-Subject: [PATCH] drm/amd/display: rename PCON adaptive sync types
+From 32f959987a5da77e65a1e6ae103d36ab19ab587c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Paku=C5=82a?= <tomasz.pakula.oficjalny@gmail.com>
+Date: Fri, 19 Dec 2025 11:56:08 +0100
+Subject: [PATCH v2 2/3] drm/amd/display: rename PCON adaptive sync types
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
 Make the name more generic for the upcoming HDMI VRR over PCON
 implementation
 
-Signed-off-by: Tomasz Pakula <tomasz.pakula.mail@gmail.com>
+Signed-off-by: Tomasz Pakuła <tomasz.pakula.oficjalny@gmail.com>
 Tested-by: Bernhard Berger <bernhard.berger@gmail.com>
 ---
  drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c             | 4 ++--
@@ -16,10 +19,10 @@ Tested-by: Bernhard Berger <bernhard.berger@gmail.com>
  4 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
-index b259439..105ee9a 100644
+index 7fe40bbba265..1318d88687ae 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c
-@@ -9153,7 +9153,7 @@ static void update_freesync_state_on_stream(
+@@ -9342,7 +9342,7 @@ static void update_freesync_state_on_stream(
  
  	aconn = (struct amdgpu_dm_connector *)new_stream->dm_stream_context;
  
@@ -28,7 +31,7 @@ index b259439..105ee9a 100644
  		pack_sdp_v1_3 = aconn->pack_sdp_v1_3;
  
  		if (aconn->vsdb_info.amd_vsdb_version == 1)
-@@ -12817,7 +12817,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+@@ -13003,7 +13003,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
  	if (amdgpu_dm_connector->dc_link)
  		as_type = dm_get_adaptive_sync_support_type(amdgpu_dm_connector->dc_link);
  
@@ -38,7 +41,7 @@ index b259439..105ee9a 100644
  		if (i >= 0 && vsdb_info.freesync_supported && vsdb_info.amd_vsdb_version > 0) {
  
 diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
-index 5d032ab..53c11f1 100644
+index d0f770dd0a95..63dc9382c48e 100644
 --- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
 +++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_helpers.c
 @@ -1393,7 +1393,7 @@ enum adaptive_sync_type dm_get_adaptive_sync_support_type(struct dc_link *link)
@@ -51,7 +54,7 @@ index 5d032ab..53c11f1 100644
  	default:
  		break;
 diff --git a/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h b/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
-index 66dc9a1..91fe039 100644
+index 66dc9a19aebe..91fe039c0c95 100644
 --- a/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
 +++ b/drivers/gpu/drm/amd/display/modules/inc/mod_info_packet.h
 @@ -44,8 +44,8 @@ void mod_build_hf_vsif_infopacket(const struct dc_stream_state *stream,
@@ -66,7 +69,7 @@ index 66dc9a1..91fe039 100644
  };
  
 diff --git a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
-index b3d55ca..429bc0a 100644
+index b3d55cac3569..429bc0ab86d6 100644
 --- a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 +++ b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 @@ -535,12 +535,12 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
