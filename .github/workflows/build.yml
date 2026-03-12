@@ -18,6 +18,13 @@ on:
       - 'patches/**'
       - '.github/workflows/build.yml'
 
+concurrency:
+  group: kernel-vrr-build
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
 env:
   FEDORA_VERSION: '43'
   COPR_PROJECT: 'kernel-vrr-pcon'
@@ -25,64 +32,81 @@ env:
 jobs:
   check-kernel:
     runs-on: ubuntu-latest
+    container:
+      image: fedora:43
     outputs:
-      kernel_version: ${{ steps.check.outputs.kernel_version }}
+      nvr: ${{ steps.check.outputs.nvr }}
       should_build: ${{ steps.check.outputs.should_build }}
     steps:
+      - name: Install dependencies
+        run: dnf install -y koji git rpmdevtools
+
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Check for new kernel version
         id: check
         run: |
-          # Get latest kernel version from Fedora
-          KERNEL_VER=$(curl -s "https://bodhi.fedoraproject.org/updates/?packages=kernel&status=stable&releases=F${{ env.FEDORA_VERSION }}" | \
-            jq -r '.updates[0].builds[0].nvr // empty' 2>/dev/null || echo "")
-
-          if [ -z "${KERNEL_VER}" ]; then
-            # Fallback: check koji
-            KERNEL_VER=$(curl -s "https://kojipkgs.fedoraproject.org/packages/kernel/" | \
-              grep -oP 'href="\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' | sort -V | tail -1)
-            KERNEL_VER="kernel-${KERNEL_VER}"
-          fi
-
-          # Extract just the version number (e.g., 6.17.12)
-          KERNEL_VER_SHORT=$(echo "${KERNEL_VER}" | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
-          echo "kernel_version=${KERNEL_VER_SHORT}" >> $GITHUB_OUTPUT
-          echo "Latest Fedora kernel: ${KERNEL_VER_SHORT}"
-
-          # Check COPR for existing successful builds with this version
-          COPR_BUILDS=$(curl -s "https://copr.fedorainfracloud.org/api_3/build/list?ownername=${{ secrets.COPR_USERNAME }}&projectname=${{ env.COPR_PROJECT }}&status=succeeded" | \
-            jq -r '.items[].source_package.version // empty' 2>/dev/null || echo "")
-
-          ALREADY_BUILT=false
-          for built_ver in $COPR_BUILDS; do
-            if echo "$built_ver" | grep -q "^${KERNEL_VER_SHORT}"; then
-              ALREADY_BUILT=true
-              echo "Found existing COPR build: ${built_ver}"
-              break
+          # Get newest kernel NVR across Koji tags
+          NVR=""
+          for tag in f${{ env.FEDORA_VERSION }}-updates f${{ env.FEDORA_VERSION }}-updates-candidate f${{ env.FEDORA_VERSION }}; do
+            TAG_NVR=$(koji list-tagged --latest "${tag}" kernel 2>/dev/null | awk 'NR>2 && /^kernel-/{print $1; exit}')
+            if [ -n "${TAG_NVR}" ]; then
+              echo "Found in tag ${tag}: ${TAG_NVR}"
+              if [ -z "${NVR}" ] || { rc=0; rpmdev-vercmp "${TAG_NVR}" "${NVR}" &>/dev/null || rc=$?; [ "$rc" -eq 11 ]; }; then
+                NVR="${TAG_NVR}"
+              fi
             fi
           done
+
+          if [ -z "${NVR}" ]; then
+            echo "Error: Could not determine kernel NVR from Koji"
+            exit 1
+          fi
+          echo "Using newest: ${NVR}"
+
+          echo "Latest Fedora kernel NVR: ${NVR}"
+          echo "nvr=${NVR}" >> $GITHUB_OUTPUT
+
+          # Read last built NVR from state file
+          LAST_NVR=""
+          if [ -f state/last_nvr ]; then
+            LAST_NVR=$(cat state/last_nvr | tr -d '[:space:]')
+          fi
+          echo "Last built NVR: ${LAST_NVR:-<none>}"
+
+          # Check if NVR is older than what we already built
+          IS_NEWER=true
+          if [ -n "${LAST_NVR}" ]; then
+            rc=0; rpmdev-vercmp "${NVR}" "${LAST_NVR}" &>/dev/null || rc=$?
+            if [ "$rc" -eq 12 ]; then
+              IS_NEWER=false
+              echo "Available kernel ${NVR} is older than last built ${LAST_NVR}"
+            fi
+          fi
 
           if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             echo "Force build requested"
+          elif [ "${IS_NEWER}" = "false" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "Skipping: ${NVR} is older than last built ${LAST_NVR}"
           elif [ "${{ github.event_name }}" = "push" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             echo "Push event - rebuilding with updated patches"
-          elif [ "$ALREADY_BUILT" = "true" ]; then
+          elif [ "${NVR}" = "${LAST_NVR}" ]; then
             echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "Kernel ${KERNEL_VER_SHORT} already built in COPR, skipping"
+            echo "Kernel ${NVR} already built, skipping"
           else
             echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "New kernel ${KERNEL_VER_SHORT} - will build"
+            echo "New kernel ${NVR} - will build"
           fi
 
   build:
     needs: check-kernel
     if: needs.check-kernel.outputs.should_build == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 450  # 7.5 hours to allow for 7-hour COPR build + overhead
+    timeout-minutes: 30
     container:
       image: fedora:43
     steps:
@@ -90,15 +114,14 @@ jobs:
         run: |
           dnf install -y \
             git \
+            gh \
             rpm-build \
             rpmdevtools \
             dnf-plugins-core \
             python3-copr \
             copr-cli \
-            cpio \
-            wget \
-            curl \
-            jq
+            koji \
+            wget
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,23 +132,9 @@ jobs:
       - name: Download kernel SRPM
         run: |
           cd ~/rpmbuild/SRPMS
-          KERNEL_VER="${{ needs.check-kernel.outputs.kernel_version }}"
-
-          # Get the full NVR (name-version-release) from Koji
-          KOJI_URL="https://kojipkgs.fedoraproject.org/packages/kernel/${KERNEL_VER}"
-
-          # Find the Fedora release number (e.g., 300.fc43)
-          FC_RELEASE=$(curl -s "${KOJI_URL}/" | grep -oP 'href="\K[0-9]+\.fc${{ env.FEDORA_VERSION }}(?=/)' | sort -V | tail -1)
-
-          if [ -z "${FC_RELEASE}" ]; then
-            echo "Error: Could not find kernel ${KERNEL_VER} for Fedora ${{ env.FEDORA_VERSION }}"
-            exit 1
-          fi
-
-          # Download the SRPM
-          SRPM_URL="${KOJI_URL}/${FC_RELEASE}/src/kernel-${KERNEL_VER}-${FC_RELEASE}.src.rpm"
-          echo "Downloading from: ${SRPM_URL}"
-          wget "${SRPM_URL}"
+          NVR="${{ needs.check-kernel.outputs.nvr }}"
+          echo "Downloading SRPM for: ${NVR}"
+          koji download-build --arch=src "${NVR}"
 
           SRPM=$(ls -1 kernel-*.src.rpm | head -1)
           echo "KERNEL_SRPM=${SRPM}" >> $GITHUB_ENV
@@ -134,64 +143,34 @@ jobs:
       - name: Extract and patch SRPM
         run: |
           cd ~/rpmbuild/SRPMS
-          rpm2cpio ${KERNEL_SRPM} | cpio -idmv -D ~/rpmbuild/SOURCES/
+          rpm -i ${KERNEL_SRPM}
 
           # Copy our patches
           cp $GITHUB_WORKSPACE/patches/*.patch ~/rpmbuild/SOURCES/
 
-          # Move spec file
-          mv ~/rpmbuild/SOURCES/kernel.spec ~/rpmbuild/SPECS/
-
       - name: Modify spec file
         run: |
           cd ~/rpmbuild/SPECS
+          PATCH_NUM=1000000
 
-          # Get the last patch number in the spec
-          LAST_PATCH=$(grep -E "^Patch[0-9]+:" kernel.spec | tail -1 | sed 's/Patch\([0-9]*\):.*/\1/')
-          NEXT_PATCH=$((LAST_PATCH + 1))
-
-          # Prepare patch lines
-          PATCH_LINES=""
-          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
+          for patch in "$GITHUB_WORKSPACE"/patches/*.patch; do
             pname=$(basename "${patch}")
-            PATCH_LINES="${PATCH_LINES}\nPatch${NEXT_PATCH}: ${pname}"
-            NEXT_PATCH=$((NEXT_PATCH + 1))
+
+            # Add patch definition (idempotent)
+            if ! grep -qF "Patch${PATCH_NUM}: ${pname}" kernel.spec; then
+              sed -i "/^# END OF PATCH DEFINITIONS/i\\Patch${PATCH_NUM}: ${pname}" kernel.spec
+            fi
+
+            # Add patch application (idempotent)
+            if ! grep -qF "ApplyOptionalPatch ${pname}" kernel.spec; then
+              sed -i "/^# END OF PATCH APPLICATIONS/i\\ApplyOptionalPatch ${pname}" kernel.spec
+            fi
+
+            PATCH_NUM=$((PATCH_NUM + 1))
           done
-
-          # Add patch definitions after Source lines section
-          # Using a temp file approach for complex sed
-          awk -v patches="$PATCH_LINES" '
-            /^Patch[0-9]+:.*\.patch$/ { last_patch = NR; line = $0 }
-            { lines[NR] = $0 }
-            END {
-              for (i = 1; i <= NR; i++) {
-                print lines[i]
-                if (i == last_patch) {
-                  printf "%s", patches
-                }
-              }
-            }
-          ' kernel.spec > kernel.spec.new
-          mv kernel.spec.new kernel.spec
-
-          # Add patch applications - find where patches are applied
-          # Fedora kernel uses ApplyOptionalPatch macro
-          APPLY_LINES=""
-          for patch in $GITHUB_WORKSPACE/patches/*.patch; do
-            pname=$(basename "${patch}")
-            APPLY_LINES="${APPLY_LINES}\nApplyOptionalPatch ${pname}"
-          done
-
-          # Insert before "# END OF PATCH APPLICATIONS" or at end of patch section
-          sed -i "/^# END OF PATCH APPLICATIONS/i\\
-          # AMD VRR PCON patches from gitlab.freedesktop.org/drm/amd issues 4773 and 4805${APPLY_LINES}" kernel.spec || \
-          sed -i "/ApplyOptionalPatch linux-kernel-test.patch/a\\
-          # AMD VRR PCON patches${APPLY_LINES}" kernel.spec
 
           # Modify release to indicate patched build
-          sed -i 's/^%define specrelease [0-9]*$/%define specrelease 1.vrr.pcon/' kernel.spec
-          # Also handle the buildid
-          sed -i 's/# define buildid .local/%define buildid .vrr.pcon/' kernel.spec
+          sed -i 's/^%define specrelease \([0-9]*\)\(%{?buildid}%{?dist}\)/%define specrelease \1.vrr.pcon\2/' kernel.spec
 
       - name: Build SRPM
         run: |
@@ -212,6 +191,27 @@ jobs:
           path: "*.src.rpm"
           retention-days: 7
 
+      - name: Publish SRPM to GitHub Releases
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+          NVR="${{ needs.check-kernel.outputs.nvr }}"
+          SRPM=$(ls -1 $GITHUB_WORKSPACE/*.src.rpm | head -1)
+          # Replace any existing release for this NVR so re-runs work cleanly
+          gh release delete "${NVR}" --yes 2>/dev/null || true
+          gh release create "${NVR}" \
+            --target main \
+            --title "kernel ${NVR}" \
+            --notes "Patched kernel SRPM for ${NVR} with VRR PCON support" \
+            "${SRPM}"
+          SRPM_BASENAME=$(basename "${SRPM}")
+          SRPM_URL="https://github.com/${{ github.repository }}/releases/download/${NVR}/${SRPM_BASENAME}"
+          echo "SRPM_URL=${SRPM_URL}" >> $GITHUB_ENV
+          echo "SRPM published to: ${SRPM_URL}"
+
       - name: Setup COPR credentials
         if: github.event_name != 'pull_request'
         run: |
@@ -227,11 +227,30 @@ jobs:
       - name: Upload to COPR
         if: github.event_name != 'pull_request'
         run: |
-          SRPM=$(ls -1 $GITHUB_WORKSPACE/*.src.rpm | head -1)
-
-          # Submit build (project already created via web UI)
-          # Timeout set to 7 hours (25200 seconds) for kernel builds
-          copr-cli build ${{ env.COPR_PROJECT }} "${SRPM}" \
+          # Use buildurl so COPR fetches from GitHub Releases CDN
+          copr-cli build ${{ env.COPR_PROJECT }} "${{ env.SRPM_URL }}" \
             --chroot fedora-43-x86_64 \
-            --timeout 25200
+            --timeout 25200 \
+            --nowait
 
+      - name: Update state file
+        if: github.event_name != 'pull_request'
+        run: |
+          NVR="${{ needs.check-kernel.outputs.nvr }}"
+          mkdir -p $GITHUB_WORKSPACE/state
+          echo "${NVR}" > $GITHUB_WORKSPACE/state/last_nvr
+
+      - name: Commit state update
+        if: github.event_name != 'pull_request'
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/last_nvr
+          if git diff --cached --quiet; then
+            echo "No state change to commit"
+          else
+            git commit -m "state: update last_nvr to ${{ needs.check-kernel.outputs.nvr }}"
+            git push
+          fi
