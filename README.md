@@ -23,7 +23,7 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 
 ```bash
 # Enable the COPR repository
-sudo dnf copr enable YOUR_USERNAME/kernel-vrr-pcon
+sudo dnf copr enable sneed/kernel-vrr-pcon
 
 # Install the patched kernel
 sudo dnf install kernel
@@ -39,7 +39,7 @@ sudo reboot
 sudo dnf install rpm-build rpmdevtools dnf-plugins-core cpio
 
 # Clone this repository
-git clone https://github.com/YOUR_USERNAME/fedora-kernel-vrr-patches.git
+git clone https://github.com/sneed/fedora-kernel-vrr-patches.git
 cd fedora-kernel-vrr-patches
 
 # Run the build script
