@@ -8,13 +8,22 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 
 | Patch | Description | Issue |
 |-------|-------------|-------|
-| 0001 | Add Chrontel CH7218 to VRR PCON whitelist | [#4773](https://gitlab.freedesktop.org/drm/amd/-/issues/4773) |
-| 0002-0005 | Enable HDMI VRR over PCON | [#4805](https://gitlab.freedesktop.org/drm/amd/-/issues/4805) |
-| 0006 | Add Parade PS196 to VRR PCON whitelist | - |
+| 0001-0027 | v4 upstream AMD VRR, HDMI gaming features, and HDMI VRR over PCON series | [#4773](https://gitlab.freedesktop.org/drm/amd/-/issues/4773), [#4805](https://gitlab.freedesktop.org/drm/amd/-/issues/4805) |
+
+### Patchset Changelog
+
+This repository is currently based on **v4** of Tomasz Pakuła's upstream series:
+
+- **v4**: Full 27-patch series for AMD VRR fixes, HDMI gaming features, HDMI VRR, ALLM, passive VRR properties, CH7218 PCON support, and HDMI VRR over PCON. This repo carries all 27 patches, with patches 23-27 rebased for Fedora 43's 7.0.2 kernel source layout.
+- **v3**: Expanded the earlier PCON-only work into a 19-patch AMD VRR and HDMI gaming features series, including VTEM/HF-VSIF work and HDMI VRR plumbing.
+- **v2**: Earlier HDMI VRR over PCON patchset used by this repo before Fedora 7.0.x; superseded by the broader v3/v4 series.
+- **v1**: Initial HDMI VRR over PCON work, superseded upstream.
+
+Upstream v4 thread: [`[PATCH v4 00/27] drm/amd: VRR fixes, HDMI Gaming Features`](https://www.mail-archive.com/dri-devel%40lists.freedesktop.org/msg589340.html).
 
 ### Tested Hardware
 
-- **Adapters**: VMM7100, Chrontel CH7218-based (Ugreen model 85564), Parade PS196-based (CalDigit DP 2.0 to HDMI 2.1)
+- **Adapters**: VMM7100, Chrontel CH7218-based (Ugreen model 85564)
 - **Displays**: Samsung S95B, LG C1, LG C4, Sony Bravia 8, Dell AW3423DWF
 
 ## Installation
@@ -89,10 +98,14 @@ env:
 
 ## Upstream Status
 
-These patches are pending upstream inclusion. Once merged into the mainline kernel, they will automatically be included in future Fedora releases and this repository will no longer be needed.
+These patches track the v4 upstream series posted on February 16, 2026: [`[PATCH v4 00/27] drm/amd: VRR fixes, HDMI Gaming Features`](https://www.mail-archive.com/dri-devel%40lists.freedesktop.org/msg589340.html).
+
+This repository carries the full v4 27-patch series. Patches 23-27 were rebased for Fedora 43's 7.0.2 kernel source layout because the upstream hunks only needed context updates in DRM core files.
+
+Once the relevant patches are merged into the mainline kernel, they will automatically be included in future Fedora releases and this repository will no longer be needed.
 
 - Issue #4773: CH7218 whitelist addition
-- Issue #4805: HDMI VRR over PCON support (4-patch series)
+- Issue #4805: HDMI VRR over PCON support
 
 ## Credits
 
