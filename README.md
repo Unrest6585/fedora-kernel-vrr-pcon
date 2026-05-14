@@ -1,6 +1,6 @@
 # Fedora Kernel with AMD VRR PCON Patches
 
-Automated builds of the Fedora 44 kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
+Automated builds of Fedora 44's stable kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
 
 Fedora 44 is the active build target. Fedora 43 COPR chroots are left enabled with their last successful builds, but new Fedora 43 kernels are no longer built.
 
