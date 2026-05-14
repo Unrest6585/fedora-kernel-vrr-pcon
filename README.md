@@ -1,6 +1,8 @@
 # Fedora Kernel with AMD VRR PCON Patches
 
-Automated builds of the Fedora 43 kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
+Automated builds of the Fedora 44 kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
+
+Fedora 44 is the active build target. Fedora 43 COPR chroots are left enabled with their last successful builds, but new Fedora 43 kernels are no longer built.
 
 ## Patches Included
 
@@ -14,7 +16,7 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 
 This repository is currently based on **v4** of Tomasz Pakuła's upstream series:
 
-- **v4**: Full 27-patch series for AMD VRR fixes, HDMI gaming features, HDMI VRR, ALLM, passive VRR properties, CH7218 PCON support, and HDMI VRR over PCON. This repo carries all 27 patches, with patches 23-27 rebased for Fedora 43's 7.0.2 kernel source layout.
+- **v4**: Full 27-patch series for AMD VRR fixes, HDMI gaming features, HDMI VRR, ALLM, passive VRR properties, CH7218 PCON support, and HDMI VRR over PCON. This repo carries all 27 patches, with patches 23-27 originally rebased for Fedora 43's 7.0.2 kernel source layout.
 - **v3**: Expanded the earlier PCON-only work into a 19-patch AMD VRR and HDMI gaming features series, including VTEM/HF-VSIF work and HDMI VRR plumbing.
 - **v2**: Earlier HDMI VRR over PCON patchset used by this repo before Fedora 7.0.x; superseded by the broader v3/v4 series.
 - **v1**: Initial HDMI VRR over PCON work, superseded upstream.
@@ -45,7 +47,7 @@ sudo reboot
 
 ```bash
 # Install build dependencies
-sudo dnf install rpm-build rpmdevtools dnf-plugins-core cpio
+sudo dnf install rpm-build rpmdevtools koji cpio
 
 # Clone this repository
 git clone https://github.com/sneed/fedora-kernel-vrr-patches.git
@@ -92,7 +94,7 @@ Edit `.github/workflows/build.yml` to customize:
 
 ```yaml
 env:
-  FEDORA_VERSION: '43'        # Target Fedora version
+  FEDORA_VERSION: '44'        # Target Fedora version
   COPR_PROJECT: 'kernel-vrr-pcon'  # COPR project name
 ```
 
@@ -100,7 +102,7 @@ env:
 
 These patches track the v4 upstream series posted on February 16, 2026: [`[PATCH v4 00/27] drm/amd: VRR fixes, HDMI Gaming Features`](https://www.mail-archive.com/dri-devel%40lists.freedesktop.org/msg589340.html).
 
-This repository carries the full v4 27-patch series. Patches 23-27 were rebased for Fedora 43's 7.0.2 kernel source layout because the upstream hunks only needed context updates in DRM core files.
+This repository carries the full v4 27-patch series. Patches 23-27 were originally rebased for Fedora 43's 7.0.2 kernel source layout because the upstream hunks only needed context updates in DRM core files.
 
 Once the relevant patches are merged into the mainline kernel, they will automatically be included in future Fedora releases and this repository will no longer be needed.
 

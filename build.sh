@@ -2,7 +2,8 @@
 # Build script for patched Fedora kernel
 set -euo pipefail
 
-FEDORA_VERSION="${FEDORA_VERSION:-43}"
+FEDORA_VERSION="${FEDORA_VERSION:-44}"
+KERNEL_NVR="${KERNEL_NVR:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
 PATCHES_DIR="${SCRIPT_DIR}/patches"
@@ -11,25 +12,43 @@ echo "==> Setting up build environment..."
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-# Get the latest kernel version from Fedora
-echo "==> Fetching latest kernel SRPM for Fedora ${FEDORA_VERSION}..."
-KERNEL_NVR=$(dnf repoquery --disablerepo='*' --enablerepo=fedora,updates --releasever="${FEDORA_VERSION}" \
-    --qf '%{name}-%{version}-%{release}' kernel 2>/dev/null | sort -V | tail -1)
+if [ -n "${KERNEL_NVR}" ]; then
+    NVR="${KERNEL_NVR}"
+    echo "==> Using pinned kernel NVR: ${NVR}"
+else
+    # Find the newest kernel NVR across Koji tags.
+    echo "==> Looking up latest kernel NVR for f${FEDORA_VERSION}..."
+    NVR=""
+    for tag in \
+        "f${FEDORA_VERSION}-updates-testing" \
+        "f${FEDORA_VERSION}-updates" \
+        "f${FEDORA_VERSION}-updates-candidate" \
+        "f${FEDORA_VERSION}"; do
+        TAG_NVR=$(koji list-tagged --latest "${tag}" kernel 2>/dev/null \
+            | awk 'NR>2 && /^kernel-/{print $1; exit}')
+        if [ -n "${TAG_NVR}" ]; then
+            echo "    Found in tag ${tag}: ${TAG_NVR}"
+            if [ -z "${NVR}" ] || { rc=0; rpmdev-vercmp "${TAG_NVR}" "${NVR}" &>/dev/null || rc=$?; [ "$rc" -eq 11 ]; }; then
+                NVR="${TAG_NVR}"
+            fi
+        fi
+    done
 
-if [ -z "${KERNEL_NVR}" ]; then
-    echo "Error: Could not determine kernel version"
-    exit 1
+    if [ -z "${NVR}" ]; then
+        echo "Error: Could not determine kernel NVR from Koji"
+        exit 1
+    fi
+    echo "==> Using newest: ${NVR}"
 fi
 
-echo "==> Found kernel: ${KERNEL_NVR}"
-
-# Download the SRPM
-echo "==> Downloading kernel SRPM..."
-dnf download --source --disablerepo='*' --enablerepo=fedora,updates \
-    --releasever="${FEDORA_VERSION}" kernel
-
-SRPM=$(ls -1 kernel-*.src.rpm | head -1)
-echo "==> Downloaded: ${SRPM}"
+# Download the SRPM from Koji.
+SRPM="${NVR}.src.rpm"
+if [ ! -f "${SRPM}" ]; then
+    echo "==> Downloading ${SRPM} from Koji..."
+    koji download-build --arch=src "${NVR}"
+else
+    echo "==> Using cached ${SRPM}"
+fi
 
 # Extract SRPM
 echo "==> Extracting SRPM..."
@@ -66,8 +85,8 @@ sed -i "/^# END OF PATCH APPLICATIONS/i\\
 # VRR PCON patches\\
 ${PATCH_APPLIES}" kernel.spec
 
-# Update the release tag to indicate this is a custom build
-sed -i 's/^%define specrelease.*/%define specrelease 1.vrr.pcon/' kernel.spec
+# Append release suffix to the specrelease (before %{?buildid}%{?dist})
+sed -i 's/^%define specrelease \([0-9]*\)\(%{?buildid}%{?dist}\)/%define specrelease \1.vrr.pcon\2/' kernel.spec
 
 echo "==> Building SRPM..."
 rpmbuild -bs kernel.spec \

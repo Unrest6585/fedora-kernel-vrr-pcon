@@ -12,6 +12,8 @@ results/
 # Editor files
 *~
 *.swp
+.codex
+.aider.chat.history.md
 .vscode/
 .idea/
 
