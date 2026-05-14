@@ -186,13 +186,6 @@ jobs:
           # Copy to workspace for artifact
           cp "${SRPM}" $GITHUB_WORKSPACE/
 
-      - name: Upload SRPM artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: kernel-srpm
-          path: "*.src.rpm"
-          retention-days: 7
-
       - name: Publish SRPM to GitHub Releases
         if: github.event_name != 'pull_request'
         env:
