@@ -14,7 +14,12 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 
 ### Patchset Changelog
 
-This repository is currently based on **v4** of Tomasz Pakuła's upstream series:
+This repository is currently based on **v4** of Tomasz Pakuła's upstream series.
+The original 27 mail patches remain in `patches/` for provenance. Builds use
+the consolidated Linux 7.1 rebase in `patches/rebased-7.1/`, which accounts for
+the generic DRM AMD VSDB parser added upstream after v4 was posted.
+
+Series history:
 
 - **v4**: Full 27-patch series for AMD VRR fixes, HDMI gaming features, HDMI VRR, ALLM, passive VRR properties, CH7218 PCON support, and HDMI VRR over PCON. This repo carries all 27 patches, with patches 23-27 originally rebased for Fedora 43's 7.0.2 kernel source layout.
 - **v3**: Expanded the earlier PCON-only work into a 19-patch AMD VRR and HDMI gaming features series, including VTEM/HF-VSIF work and HDMI VRR plumbing.

@@ -148,14 +148,14 @@ jobs:
           rpm -i ${KERNEL_SRPM}
 
           # Copy our patches
-          cp $GITHUB_WORKSPACE/patches/*.patch ~/rpmbuild/SOURCES/
+          cp "$GITHUB_WORKSPACE"/patches/rebased-7.1/*.patch ~/rpmbuild/SOURCES/
 
       - name: Modify spec file
         run: |
           cd ~/rpmbuild/SPECS
           PATCH_NUM=1000000
 
-          for patch in "$GITHUB_WORKSPACE"/patches/*.patch; do
+          for patch in "$GITHUB_WORKSPACE"/patches/rebased-7.1/*.patch; do
             pname=$(basename "${patch}")
 
             # Add patch definition (idempotent)

@@ -7,6 +7,7 @@ KERNEL_NVR="${KERNEL_NVR:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
 PATCHES_DIR="${SCRIPT_DIR}/patches"
+REBASED_PATCHES_DIR="${PATCHES_DIR}/rebased-7.1"
 
 echo "==> Setting up build environment..."
 mkdir -p "${BUILD_DIR}"
@@ -50,11 +51,11 @@ fi
 
 # Extract SRPM
 echo "==> Extracting SRPM..."
-rpm2cpio "${SRPM}" | cpio -idmv
+rpm2cpio "${SRPM}" | cpio -idmvu
 
 # Copy patches
 echo "==> Copying VRR patches..."
-cp "${PATCHES_DIR}"/*.patch .
+cp "${REBASED_PATCHES_DIR}"/*.patch .
 
 # Modify the spec file to include our patches
 echo "==> Modifying kernel.spec..."
@@ -66,7 +67,7 @@ NEXT_PATCH=$((LAST_PATCH + 1))
 # Add patch definitions after the last existing patch
 PATCH_DEFS=""
 PATCH_APPLIES=""
-for patch in "${PATCHES_DIR}"/*.patch; do
+for patch in "${REBASED_PATCHES_DIR}"/*.patch; do
     pname=$(basename "${patch}")
     PATCH_DEFS="${PATCH_DEFS}Patch${NEXT_PATCH}: ${pname}\n"
     PATCH_APPLIES="${PATCH_APPLIES}ApplyOptionalPatch ${pname}\n"
