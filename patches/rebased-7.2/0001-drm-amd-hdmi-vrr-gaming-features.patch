@@ -782,7 +782,7 @@ index 30a5259ef..2637562d2 100644
  
  #endif /* MOD_INFO_PACKET_TYPES_H_ */
 diff --git a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
-index f5ac4bf32..5740c227c 100644
+index f5ac4bf32..fb3f84994 100644
 --- a/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 +++ b/drivers/gpu/drm/amd/display/modules/info_packet/info_packet.c
 @@ -48,8 +48,12 @@ enum vsc_packet_revision {
@@ -992,11 +992,7 @@ index f5ac4bf32..5740c227c 100644
 +		info_packet->sb[1] = oui & 0xFF;
 +		info_packet->sb[2] = (oui >> 8) & 0xFF;
 +		info_packet->sb[3] = (oui >> 16) & 0xFF;
- 
--			if (format != TIMING_3D_FORMAT_NONE)
--				info_packet->sb[4] = (2 << 5);
--			else if (hdmi_vic_mode)
--				info_packet->sb[4] = (1 << 5);
++
 +		if (oui == HDMI_FORUM_IEEE_OUI) {
 +			offset = 2;
 +			length += 2;
@@ -1004,7 +1000,11 @@ index f5ac4bf32..5740c227c 100644
 +			info_packet->sb[5] = stereo << HF_VSIF_3D_BIT;
 +			info_packet->sb[5] |= allm << HF_VSIF_ALLM_BIT;
 +		}
-+
+ 
+-			if (format != TIMING_3D_FORMAT_NONE)
+-				info_packet->sb[4] = (2 << 5);
+-			else if (hdmi_vic_mode)
+-				info_packet->sb[4] = (1 << 5);
 +		if (stereo) {
 +			info_packet->sb[4 + offset] = (2 << 5);
  
@@ -1026,13 +1026,13 @@ index f5ac4bf32..5740c227c 100644
  			case TIMING_3D_FORMAT_TOP_AND_BOTTOM:
  			case TIMING_3D_FORMAT_TB_SW_PACKED:
 -				info_packet->sb[5] = (0x6 << 4);
--				break;
--
--			default:
 +				info_packet->sb[5 + offset] = (0x6 << 4);
  				break;
--			}
--
+ 
+ 			default:
+ 				break;
+ 			}
+ 
 -			if (hdmi_vic_mode) {
 -				ASSERT(stream->timing.hdmi_vic <= 0xFF);
 -				info_packet->sb[5] = (uint8_t)stream->timing.hdmi_vic;
@@ -1068,7 +1068,7 @@ index f5ac4bf32..5740c227c 100644
 -			}
 -
 -			info_packet->sb[5] = (info_packet->sb[5] & ~0x02) | (bALLMVal << 1);
- 
+-
 -			switch (stream->timing.display_color_depth) {
 -			case COLOR_DEPTH_888:
 -				CCBPC = 1;
@@ -1090,10 +1090,10 @@ index f5ac4bf32..5740c227c 100644
 -			case COLOR_DEPTH_111111:
 -#endif
 -			case COLOR_DEPTH_141414:
- 			default:
- 				break;
- 			}
- 
+-			default:
+-				break;
+-			}
+-
 -			info_packet->sb[5] = (uint8_t)((info_packet->sb[5] & ~0xF0) | (CCBPC << 4));
 +		/* Doesn't need the offset as it can't be used with hf-vsif */
 +		} else if (hdmi_vic_mode) {
@@ -1111,7 +1111,97 @@ index f5ac4bf32..5740c227c 100644
  
  		checksum += info_packet->hb0;
  		checksum += info_packet->hb1;
-@@ -658,7 +615,7 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
+@@ -644,6 +601,89 @@ void mod_build_hf_vsif_infopacket(const struct dc_stream_state *stream,
+ 		info_packet->valid = true;
+ }
+ 
++static void build_vtem_infopacket_header(struct dc_info_packet *infopacket)
++{
++	uint8_t pb0 = 0;
++
++	/* might need logic in the future */
++	pb0 |= 0 << EMP_SNC_BIT;
++	pb0 |= 1 << EMP_VFR_BIT;
++	pb0 |= 0 << EMP_AFR_BIT;
++	pb0 |= 0 << EMP_DST_BIT;
++	pb0 |= 0 << EMP_END_BIT;
++	pb0 |= 1 << EMP_NEW_BIT;
++
++	infopacket->hb0 = HDMI_INFOFRAME_TYPE_EMP;
++	infopacket->hb1 = (1 << EMP_FIRST_BIT) | (1 << EMP_LAST_BIT);
++	infopacket->hb2 = 0; // sequence
++
++	infopacket->sb[VTEM_PB0] = pb0;
++	infopacket->sb[VTEM_PB2] = VTEM_ORG_ID;
++	infopacket->sb[VTEM_PB4] = VTEM_DATA_SET_TAG;
++	infopacket->sb[VTEM_PB6] = VTEM_DATA_SET_LENGTH;
++}
++
++static void build_vtem_infopacket_data(const struct dc_stream_state *stream,
++		const struct mod_vrr_params *vrr,
++		struct dc_info_packet *infopacket)
++{
++	unsigned int hblank = 0;
++	unsigned int brr = 0;
++	bool vrr_active = false;
++	bool rb = false;
++
++	vrr_active = vrr->state == VRR_STATE_ACTIVE_VARIABLE ||
++		     vrr->state == VRR_STATE_ACTIVE_FIXED;
++	/*
++	 * Enables FreeSync-like behavior by keeping HDMI VRR signalling active
++	 * in fixed refresh rate conditions like normal desktop work/web browsing.
++	 * Functinally behaves like non-VRR mode by keeping the actual refresh
++	 * rate fixed.
++	 */
++	if (stream->freesync_on_desktop)
++		vrr_active |= vrr->state == VRR_STATE_INACTIVE;
++
++	infopacket->sb[VTEM_MD0] = VTEM_M_CONST << VTEM_M_CONST_BIT;
++	infopacket->sb[VTEM_MD0] |= VTEM_FVA_FACTOR << VTEM_FVA_BIT;
++	infopacket->sb[VTEM_MD0] |= vrr_active << VTEM_VRR_BIT;
++
++	infopacket->sb[VTEM_MD1] = 0;
++	infopacket->sb[VTEM_MD2] = 0;
++	infopacket->sb[VTEM_MD3] = 0;
++
++	if (!vrr_active || is_hdmi_vic_mode(stream))
++		return;
++	/*
++	 * In accordance with CVT 1.2 and CVT 2.1:
++	 * Reduced Blanking standard defines a fixed value of
++	 * 160 for hblank, further reduced to 80 in RB2. RB3 uses
++	 * fixed hblank of 80 pixels + up to 120 additional pixels
++	 * in 8-pixel steps.
++	 */
++	hblank = stream->timing.h_total - stream->timing.h_addressable;
++	rb = (hblank >= 80 && hblank <= 200 && hblank % 8 == 0);
++	brr = div_u64(mod_freesync_calc_nominal_field_rate(stream), 1000000);
++
++	if (brr > VTEM_BRR_MAX) {
++		infopacket->valid = false;
++		return;
++	}
++
++	infopacket->sb[VTEM_MD1] = (uint8_t) stream->timing.v_front_porch;
++	infopacket->sb[VTEM_MD2] = rb << VTEM_RB_BIT;
++	infopacket->sb[VTEM_MD2] |= (brr >> 8) & VTEM_BRR_MASK_UPPER;
++	infopacket->sb[VTEM_MD3] = brr & VTEM_BRR_MASK_LOWER;
++}
++
++void mod_build_vtem_infopacket(const struct dc_stream_state *stream,
++		const struct mod_vrr_params *vrr,
++		struct dc_info_packet *infopacket)
++{
++	infopacket->valid = true;
++	build_vtem_infopacket_header(infopacket);
++	build_vtem_infopacket_data(stream, vrr, infopacket);
++}
++
+ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
+ 		enum adaptive_sync_type asType,
+ 		const struct AS_Df_params *param,
+@@ -658,7 +698,7 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
  		if (stream != NULL)
  			mod_build_adaptive_sync_infopacket_v2(stream, param, info_packet);
  		break;
@@ -1120,7 +1210,7 @@ index f5ac4bf32..5740c227c 100644
  	case ADAPTIVE_SYNC_TYPE_EDP:
  		if (stream && stream->link->replay_settings.config.replay_supported &&
  			stream->link->replay_settings.config.replay_version == DC_VESA_PANEL_REPLAY)
-@@ -667,7 +624,8 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
+@@ -667,7 +707,8 @@ void mod_build_adaptive_sync_infopacket(const struct dc_stream_state *stream,
  			mod_build_adaptive_sync_infopacket_v1(info_packet);
  		break;
  	case ADAPTIVE_SYNC_TYPE_NONE:
