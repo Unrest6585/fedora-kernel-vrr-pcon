@@ -1,8 +1,23 @@
 # Fedora Kernel with AMD VRR PCON Patches
 
-Automated builds of Fedora 44's stable kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
+> [!WARNING]
+> **Phased out.** This project no longer builds new kernels. The `sneed/kernel-vrr-pcon` COPR repository is frozen at its last build, `kernel-7.2.8-200.vrr.pcon.fc44`, and will not receive updates, including security fixes. The 7.2.8 build compiles and links but has not been tested on PCON hardware.
+>
+> As soon as Fedora publishes a newer kernel, `dnf upgrade` will replace this kernel with Fedora's stock kernel, which has no HDMI VRR over PCON support.
+>
+> Upstream status:
+>
+> - **Native HDMI 2.1 VRR and ALLM** (HDMI sink connected directly to the GPU) are being upstreamed by AMD in a reduced 4-patch series based on this work ([v2, August 2026](https://ratatoskr.run/amd-gfx/2026/07/17344987/t)), expected in Linux 7.4.
+> - **VRR over DP-to-HDMI adapters (PCON)**, the CH7218 PCON ID and the passive VRR/ALLM connector properties are not part of that series and have no upstream path at the moment.
+>
+> To switch back to Fedora's kernel:
+>
+> ```bash
+> sudo dnf copr remove sneed/kernel-vrr-pcon
+> sudo dnf upgrade --refresh kernel
+> ```
 
-Fedora 44 is the active build target. Fedora 43 COPR chroots are left enabled with their last successful builds, but new Fedora 43 kernels are no longer built.
+These were builds of Fedora 44's stable kernel with patches for AMD VRR (Variable Refresh Rate) over PCON (Protocol Converter) support.
 
 ## Patches Included
 
@@ -90,10 +105,7 @@ Add these secrets to your repository (Settings → Secrets and variables → Act
 
 ### 3. Workflow Triggers
 
-The workflow runs:
-- **Daily** at 6 AM UTC to check for new kernels
-- **On push** when patches or workflow files change
-- **Manually** via workflow_dispatch (with optional force build)
+The scheduled and push triggers have been removed since the project was phased out. The workflow can still be run manually via workflow_dispatch (with optional force build).
 
 ## Configuration
 
