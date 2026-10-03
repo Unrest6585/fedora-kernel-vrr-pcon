@@ -16,8 +16,10 @@ These patches enable HDMI VRR support for DP-to-HDMI 2.1 adapters on displays th
 
 This repository is currently based on **v4** of Tomasz Pakuła's upstream series.
 The original 27 mail patches remain in `patches/` for provenance. Builds use
-the consolidated Linux 7.1 rebase in `patches/rebased-7.1/`, which accounts for
-the generic DRM AMD VSDB parser added upstream after v4 was posted.
+the consolidated Linux 7.2 rebase in `patches/rebased-7.2/`, which accounts for
+the generic DRM AMD VSDB parser added upstream after v4 was posted and for the
+HF-VSIF/adaptive sync type changes that came with AMD's upstream HDMI FRL support
+in Linux 7.2.
 
 Series history:
 

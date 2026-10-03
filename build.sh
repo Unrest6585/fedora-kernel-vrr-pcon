@@ -7,7 +7,7 @@ KERNEL_NVR="${KERNEL_NVR:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
 PATCHES_DIR="${SCRIPT_DIR}/patches"
-REBASED_PATCHES_DIR="${PATCHES_DIR}/rebased-7.1"
+REBASED_PATCHES_DIR="${PATCHES_DIR}/rebased-7.2"
 
 echo "==> Setting up build environment..."
 mkdir -p "${BUILD_DIR}"
